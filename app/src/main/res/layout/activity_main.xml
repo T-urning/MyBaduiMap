@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    tools:context="com.example.administrator.mybaidumap.MainActivity">
+        <com.baidu.mapapi.map.MapView
+        android:id="@+id/bmapView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="true"
+            />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignStart="@+id/bmapView"
+        android:layout_alignLeft="@+id/bmapView"
+        android:id="@+id/linearLayout">
+        <EditText
+            android:layout_weight="1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/searchResult_bar"
+             />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="至"
+            android:textStyle="bold"/>
+        <EditText
+            android:layout_weight="1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/searchResult_bar2"
+           />
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/search_btn"
+            android:text="查找"
+            android:layout_weight="0.03"
+            android:textSize="20sp"
+            android:layout_alignRight="@+id/bmapView"/>
+
+    </LinearLayout>
+
+
+        <Button
+            android:id="@+id/switch_btn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="切换/删"
+            android:textSize="20sp"
+            android:layout_below="@+id/linearLayout"
+            android:layout_alignRight="@+id/bmapView" />
+        <Button
+            android:id="@+id/start_btn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="轨迹"
+            android:textSize="20sp"
+            android:layout_below="@+id/switch_btn"
+            android:layout_alignRight="@+id/bmapView" />
+        <Button
+            android:id="@+id/record_btn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="录视频"
+            android:textSize="20sp"
+            android:layout_below="@+id/start_btn"
+            android:layout_alignRight="@+id/bmapView" />
+
+
+</RelativeLayout>
