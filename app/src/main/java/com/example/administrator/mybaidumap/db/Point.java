@@ -1,6 +1,4 @@
-package com.example.administrator.mybaidumap;
-
-import com.baidu.mapapi.model.LatLng;
+package com.example.administrator.mybaidumap.db;
 
 import org.litepal.crud.DataSupport;
 

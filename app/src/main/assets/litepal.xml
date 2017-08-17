@@ -4,6 +4,6 @@
 
     <version value="4"></version>
     <list>
-        <mapping class="com.example.administrator.mybaidumap.Point"></mapping>
+        <mapping class="com.example.administrator.mybaidumap.db.Point"></mapping>
     </list>
 </litepal>

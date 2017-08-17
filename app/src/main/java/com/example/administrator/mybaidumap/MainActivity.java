@@ -52,6 +52,7 @@ import com.baidu.trace.model.ProcessOption;
 import com.baidu.trace.model.PushMessage;
 import com.baidu.trace.model.TraceLocation;
 import com.baidu.trace.model.TransportMode;
+import com.example.administrator.mybaidumap.db.Point;
 
 import org.litepal.LitePal;
 import org.litepal.crud.DataSupport;
@@ -91,24 +92,19 @@ public class MainActivity extends Activity {
     private static BitmapDescriptor videoPointBitmap = null;
     private static OverlayOptions overlay; //起始点图标overlay
     private static PolylineOptions polyline;
-    private List<LatLng>pointList = new ArrayList<>();
+    private List<LatLng> pointList = new ArrayList<>();
     private Trace trace;
     private LBSTraceClient client;
-    private LocRequest locRequest = null;
-    
+
 
 
     private boolean isFirstLoc = true;  //是否首次定位
     //   查询历史轨迹request选项定义
-    private boolean isNeedObjectStorage = false;
     private long serviceId = 141540;    //轨迹服务id
-    private int gatherInterval = 1; //定位周期，秒
     private int packInterval = 3;  //打包回传周期，秒
-    private int tag = 1;    //请求标识
     private long startTime; //记录轨迹开始时间
     private long endTime;   //终止时间
     private int groupId;
-    private String entityName = "";
     ProcessOption processOption = new ProcessOption();
 
 
@@ -242,6 +238,7 @@ public class MainActivity extends Activity {
          * @param marker 视频图标点击后，播放对应视频
          */
         public boolean onMarkerClick(Marker marker){
+            System.out.println("onMarkerClick: 有有。。。。。1");
 
             LatLng markerPoint = marker.getPosition();
             try {
@@ -249,21 +246,24 @@ public class MainActivity extends Activity {
                 if (points.size()>=1) {
                     for(Point point : points){
                         if(point.getLatitude()==markerPoint.latitude && point.getLongitude()==markerPoint.longitude){
-                            if (!point.getSavePath().equals("")) {
-                                Intent intent = new Intent(getApplicationContext(),PlayActivity.class);
-                                intent.putExtra("filename",point.getSavePath());
-                                startActivity(intent);
-
-                            } else if(point.getStartOrEnd() == 1 || point.getStartOrEnd() ==2) {
+                            if(point.getStartOrEnd() == 1 || point.getStartOrEnd() == 2) {
                                 Intent intent = new Intent(MainActivity.this, DialogActivity.class);
                                 intent.putExtra("pointDate", point.getDate().toString());
                                 startActivity(intent);
                             }
+                            if (!point.getSavePath().equals("")) {
+                                Intent intent = new Intent(MainActivity.this,PlayActivity.class);
+                                intent.putExtra("filename",point.getSavePath());
+                                startActivity(intent);
+
+                            }
+
+
                             break;
                         }
 
                     }
-                    
+
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -282,33 +282,10 @@ public class MainActivity extends Activity {
         StrictMode.VmPolicy.Builder builder = new StrictMode.VmPolicy.Builder();
         StrictMode.setVmPolicy(builder.build());  //  In this way the VM ignores the file URI exposure.
         init(); //相关变量初始化
-        initOnEntityListener(); //初始化实体监听器
-        initOnStartTraceListener(); //轨迹监听器
+        initListener(); //初始化监听器
         LitePal.getDatabase();  //建立数据库
-
-        prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
-
-        List <Point> points = DataSupport.findAll(Point.class);
-
-        if (!points.isEmpty()) {
-            for(Point point : points){
-                try {
-                    Log.d(TAG, "onCreate: groupid--" + point.getGroupId());
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    System.out.println("----------wrong");
-                }
-                System.out.println("数据 "+point.toString());
-            }
-        } else {
-            Log.d(TAG, "onCreate: " + "没有");
-            System.out.println("----------wrong");
-        }
-        //DataSupport.deleteAll(Point.class);
-        //editor = prefs.edit();
-        //editor.clear();
-        //editor.apply();
-
+        
+        
     }
 
     private void init(){
@@ -329,10 +306,11 @@ public class MainActivity extends Activity {
         this.setLocationOption();
         mLocClient.start();
 
-        entityName = getImei(getApplicationContext());
+        int gatherInterval = 1; //定位周期，秒
+        String entityName = getImei(getApplicationContext());
         client = new LBSTraceClient(getApplicationContext());
         client.setLocationMode(LocationMode.Device_Sensors);
-        trace = new Trace(serviceId, entityName,isNeedObjectStorage);  //实例化轨迹服务
+        trace = new Trace(serviceId, entityName,false);  //实例化轨迹服务
         client.setInterval(gatherInterval, packInterval);  //设置位置采集和打包周期
         client.startTrace(trace, startTraceListener);
         realtimeBitmap = BitmapDescriptorFactory.fromResource(R.drawable.icon_start);
@@ -342,17 +320,19 @@ public class MainActivity extends Activity {
         processOption.isNeedMapMatch();
         processOption.isNeedVacuate();
         processOption.setTransportMode(TransportMode.walking);
+
+        prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
     }
 
 
-    private void initOnEntityListener(){
+    private void initListener(){
         /**
-         * 切换地图样式
+         * 切换地图样式（附加清除数据）
          */
         switchButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                
+
                 if (switchStyleFlag) {
                     DataSupport.deleteAll(Point.class);
                     editor = prefs.edit();
@@ -404,7 +384,7 @@ public class MainActivity extends Activity {
 
                         //historyTrackRequest = new HistoryTrackRequest(tag,serviceId
                         //            ,entityName,startTime,endTime,isProcessed,processOption,
-                          //          supplementMode,sortType, coordType,pageIndex,pageSize);
+                        //          supplementMode,sortType, coordType,pageIndex,pageSize);
 
                         //client.queryHistoryTrack(historyTrackRequest,onTrackListener);
 
@@ -567,41 +547,7 @@ public class MainActivity extends Activity {
     /**
      *  追踪开始
      */
-    private void initOnStartTraceListener() {
-
-        // 实例化开启轨迹服务回调接口
-        startTraceListener = new OnTraceListener() {
-            @Override
-            public void onStartTraceCallback(int i, String s) {
-                Log.i("TAG", "onTraceCallback=" + s);
-
-            }
-
-            @Override
-            public void onStopTraceCallback(int i, String s) {
-
-            }
-
-            @Override
-            public void onStartGatherCallback(int i, String s) {
-
-            }
-
-            @Override
-            public void onStopGatherCallback(int i, String s) {
-
-            }
-
-            @Override
-            public void onPushCallback(byte b, PushMessage pushMessage) {
-                Log.i("TAG", "onTracePushCallback=" + pushMessage);
-
-            }
-
-        };
-
-
-    }
+    
     private class RefreshThread extends Thread{
 
         protected boolean refresh = true;
@@ -626,7 +572,7 @@ public class MainActivity extends Activity {
      */
     private void queryRealtimeTrack(){
 
-        locRequest = new LocRequest(tag,serviceId);
+        LocRequest locRequest = new LocRequest(1,serviceId);
         client.queryRealTimeLoc(locRequest,entityListener);
 
     }
@@ -689,19 +635,25 @@ public class MainActivity extends Activity {
 
     private void drawHistoryByGroup(List<Point> points) {
         List<LatLng> latlngs = new ArrayList<>();
+        BitmapDescriptor startPointBitmap = BitmapDescriptorFactory.fromResource(R.drawable.ic_start);
+        BitmapDescriptor endPointBitmap = BitmapDescriptorFactory.fromResource(R.drawable.ic_end);
         for(Point point : points){
             LatLng ll = new LatLng(point.getLatitude(),point.getLongitude());
             latlngs.add(ll);
+            if(point.getStartOrEnd() == 1){
+                LatLng start = new LatLng(point.getLatitude(),point.getLongitude());
+                overlay = new MarkerOptions().position(start)
+                        .icon(startPointBitmap).zIndex(9).draggable(false);
+                mBaiduMap.addOverlay(overlay);
+            } else if(point.getStartOrEnd() == 2){
+                LatLng end = new LatLng(point.getLatitude(),point.getLongitude());
+                overlay = new MarkerOptions().position(end)
+                        .icon(endPointBitmap).zIndex(9).draggable(false);
+                mBaiduMap.addOverlay(overlay);
+
+            }
         }
-        BitmapDescriptor startPointBitmap = BitmapDescriptorFactory.fromResource(R.drawable.ic_start);
-        BitmapDescriptor endPointBitmap = BitmapDescriptorFactory.fromResource(R.drawable.ic_end);
-        overlay = new MarkerOptions().position(latlngs.get(0))
-                .icon(startPointBitmap).zIndex(9).draggable(false);
-        mBaiduMap.addOverlay(overlay);
-        overlay = new MarkerOptions().position(latlngs.get(latlngs.size()-1))
-                .icon(endPointBitmap).zIndex(9).draggable(false);
-        mBaiduMap.addOverlay(overlay);
-        polyline = new PolylineOptions().width(10).color(Color.BLUE).points(latlngs);
+        polyline = new PolylineOptions().width(15).color(Color.BLUE).points(latlngs);
         mBaiduMap.addOverlay(polyline);
     }
 
@@ -741,32 +693,32 @@ public class MainActivity extends Activity {
         switch (requestCode){
             case 1:
                 if (resultCode == RESULT_OK) {
-                        // Video captured and saved to fileUri specified in the Intent
-                        Toast.makeText(this, "Video saved to:\n" +
-                                data.getData(), Toast.LENGTH_SHORT).show();
-                        int size = pointList.size();
-                        if (size>=1) {
+                    // Video captured and saved to fileUri specified in the Intent
+                    Toast.makeText(this, "Video saved to:\n" +
+                            data.getData(), Toast.LENGTH_SHORT).show();
+                    int size = pointList.size();
+                    if (size>=1) {
                         //               在最新轨迹点上添加视频图标
-                            LatLng latLng = new LatLng(pointList.get(size-1).latitude,pointList.get(size-1).longitude);
-                            videoPointBitmap = BitmapDescriptorFactory.fromResource(R.drawable.icon_video);
-                            overlay = new MarkerOptions().position(latLng)
-                                    .icon(videoPointBitmap).zIndex(7).draggable(true);
-                            mBaiduMap.addOverlay(overlay);
-                            String savePath = data.getData().toString();
-                            //录视频后，赋予最新点视频存储路径
-                            Point point = DataSupport.findLast(Point.class);
-                            point.setSavePath(savePath);
-                            point.save();
-                        }else {
-                            Toast.makeText(getApplicationContext(),"未开始记轨！",Toast.LENGTH_SHORT).show();
-                        }
+                        LatLng latLng = new LatLng(pointList.get(size-1).latitude,pointList.get(size-1).longitude);
+                        videoPointBitmap = BitmapDescriptorFactory.fromResource(R.drawable.icon_video);
+                        overlay = new MarkerOptions().position(latLng)
+                                .icon(videoPointBitmap).zIndex(7).draggable(false);
+                        mBaiduMap.addOverlay(overlay);
+                        String savePath = data.getData().toString();
+                        //录视频后，赋予最新点视频存储路径
+                        Point point = DataSupport.findLast(Point.class);
+                        point.setSavePath(savePath);
+                        point.save();
+                    }else {
+                        Toast.makeText(getApplicationContext(),"未开始记轨！",Toast.LENGTH_SHORT).show();
+                    }
 
                 } else if (resultCode == RESULT_CANCELED) {
-                        // User cancelled the icon_video capture
-                        Toast.makeText(this,"已退出", Toast.LENGTH_SHORT).show();
+                    // User cancelled the icon_video capture
+                    Toast.makeText(this,"已退出", Toast.LENGTH_SHORT).show();
                 } else {
-                        // Video capture failed, advise user
-                        Toast.makeText(this,"请重试",Toast.LENGTH_SHORT).show();
+                    // Video capture failed, advise user
+                    Toast.makeText(this,"请重试",Toast.LENGTH_SHORT).show();
                 }
                 break;
             default:
