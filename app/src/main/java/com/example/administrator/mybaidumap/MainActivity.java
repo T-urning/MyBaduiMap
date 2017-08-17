@@ -48,10 +48,7 @@ import com.baidu.trace.api.entity.LocRequest;
 import com.baidu.trace.api.entity.OnEntityListener;
 import com.baidu.trace.model.LocationMode;
 import com.baidu.trace.model.OnTraceListener;
-import com.baidu.trace.model.ProcessOption;
-import com.baidu.trace.model.PushMessage;
 import com.baidu.trace.model.TraceLocation;
-import com.baidu.trace.model.TransportMode;
 import com.example.administrator.mybaidumap.db.Point;
 
 import org.litepal.LitePal;
@@ -93,23 +90,20 @@ public class MainActivity extends Activity {
     private static OverlayOptions overlay; //起始点图标overlay
     private static PolylineOptions polyline;
     private List<LatLng> pointList = new ArrayList<>();
-    private Trace trace;
     private LBSTraceClient client;
 
 
 
     private boolean isFirstLoc = true;  //是否首次定位
-    //   查询历史轨迹request选项定义
-    private long serviceId = 141540;    //轨迹服务id
-    private int packInterval = 3;  //打包回传周期，秒
     private long startTime; //记录轨迹开始时间
     private long endTime;   //终止时间
     private int groupId;
-    ProcessOption processOption = new ProcessOption();
+
 
 
 
     public BDLocationListener myListener = new BDLocationListener() {
+
         @Override
         public void onReceiveLocation(BDLocation bdLocation) {
             //mMapView 销毁后不再处理新接收的位置信息
@@ -220,7 +214,7 @@ public class MainActivity extends Activity {
                     }
                 }
 
-                Log.i("BaiduLocationApiDem", sb.toString());
+                Log.i(TAG, sb.toString());
                 Toast.makeText(getApplicationContext(),bdLocation.getAddrStr(),
                         Toast.LENGTH_SHORT).show();
             }
@@ -306,20 +300,15 @@ public class MainActivity extends Activity {
         this.setLocationOption();
         mLocClient.start();
 
-        int gatherInterval = 1; //定位周期，秒
-        String entityName = getImei(getApplicationContext());
+        //int gatherInterval = 1; //定位周期，秒
+        //String entityName = getImei(getApplicationContext());
         client = new LBSTraceClient(getApplicationContext());
         client.setLocationMode(LocationMode.Device_Sensors);
-        trace = new Trace(serviceId, entityName,false);  //实例化轨迹服务
-        client.setInterval(gatherInterval, packInterval);  //设置位置采集和打包周期
-        client.startTrace(trace, startTraceListener);
+        //trace = new Trace(serviceId, entityName,false);  //实例化轨迹服务
+        //client.setInterval(gatherInterval, packInterval);  //设置位置采集和打包周期
+        //client.startTrace(trace, startTraceListener);
         realtimeBitmap = BitmapDescriptorFactory.fromResource(R.drawable.icon_start);
         //纠偏选项
-        processOption.setRadiusThreshold(20);
-        processOption.isNeedDenoise();
-        processOption.isNeedMapMatch();
-        processOption.isNeedVacuate();
-        processOption.setTransportMode(TransportMode.walking);
 
         prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
     }
@@ -381,12 +370,6 @@ public class MainActivity extends Activity {
 
                         }
                         drawHistoryTrack(historyPoints);
-
-                        //historyTrackRequest = new HistoryTrackRequest(tag,serviceId
-                        //            ,entityName,startTime,endTime,isProcessed,processOption,
-                        //          supplementMode,sortType, coordType,pageIndex,pageSize);
-
-                        //client.queryHistoryTrack(historyTrackRequest,onTrackListener);
 
                     } else{
                         Toast.makeText(getApplicationContext(),"请输入完整日期！",
@@ -462,7 +445,7 @@ public class MainActivity extends Activity {
                     startRefreshThread(true);
                     mBaiduMap.clear();
                     isFirstTrace = false;
-                    client.startGather(startTraceListener);
+                    //client.startGather(startTraceListener);
 
 
                 } else {
@@ -474,7 +457,7 @@ public class MainActivity extends Activity {
                     isFirstTrace = true;
                     pointList.clear();
                     mBaiduMap.clear();
-                    client.stopGather(startTraceListener);
+                    //client.stopGather(startTraceListener);
                     startRefreshThread(false);
                     Point point = DataSupport.findLast(Point.class);//标记为终点
                     point.setStartOrEnd(2);
@@ -551,7 +534,7 @@ public class MainActivity extends Activity {
     private class RefreshThread extends Thread{
 
         protected boolean refresh = true;
-
+        private int packInterval = 3;
         public void run(){
 
             while(refresh){
@@ -571,7 +554,7 @@ public class MainActivity extends Activity {
      * 查询实时线路
      */
     private void queryRealtimeTrack(){
-
+        long serviceId = 141540;
         LocRequest locRequest = new LocRequest(1,serviceId);
         client.queryRealTimeLoc(locRequest,entityListener);
 
@@ -593,8 +576,7 @@ public class MainActivity extends Activity {
             if(!refreshThread.isAlive()){
                 refreshThread.start();
             }
-        }
-        else{
+        } else{
             refreshThread = null;
         }
 
@@ -660,7 +642,7 @@ public class MainActivity extends Activity {
     /**
      *  获取手机识别码
      */
-
+/*
     private String getImei(Context context){
         String mImei = "NULL";
         try {
@@ -670,17 +652,17 @@ public class MainActivity extends Activity {
         }
         return mImei;
     }
-
+*/
     /**
      * 设置定位选项
      */
     private void setLocationOption() {
         LocationClientOption option = new LocationClientOption();
         option.setOpenGps(true);  //打开GPS
-        option.setLocationMode(LocationClientOption.LocationMode.Hight_Accuracy); //设置定位模式
+        option.setLocationMode(LocationClientOption.LocationMode.Device_Sensors); //设置定位模式
         option.setCoorType("bd09ll"); //返回的定位结果是百度经纬度默认值gcj02
-        //option.setScanSpan(2000);  //设置发起定位请求的间隔时间为2000ms
-        option.setOpenAutoNotifyMode(); //设置打开自动回调位置模式，该开关打开后，期间只要定位SDK检测到位置变化
+        option.setScanSpan(2000);  //设置发起定位请求的间隔时间为2000ms
+        //option.setOpenAutoNotifyMode(); //设置打开自动回调位置模式，该开关打开后，期间只要定位SDK检测到位置变化
         // 就会主动回调给开发者，该模式下开发者无需再关心定位间隔是多少，定位SDK本身发现位置变化就会及时回调给开发者
         option.setIsNeedAddress(true);  //返回的定位结果包含地址信息
         option.setNeedDeviceDirect(true);  //返回的定位结果包含手机机头的方向
@@ -763,7 +745,7 @@ public class MainActivity extends Activity {
         mMapView.onDestroy();
         mMapView = null;
         mLocClient.stop();
-        client.stopTrace(trace,startTraceListener);
+        //client.stopTrace(trace,startTraceListener);
         //DataSupport.deleteAll(Point.class);
         //editor.clear();
 
