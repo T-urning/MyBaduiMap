@@ -6,7 +6,8 @@ package com.example.administrator.mybaidumap;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.content.Context;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -16,7 +17,6 @@ import android.os.Environment;
 import android.os.StrictMode;
 import android.preference.PreferenceManager;
 import android.provider.MediaStore;
-import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -43,7 +43,6 @@ import com.baidu.mapapi.map.OverlayOptions;
 import com.baidu.mapapi.map.PolylineOptions;
 import com.baidu.mapapi.model.LatLng;
 import com.baidu.trace.LBSTraceClient;
-import com.baidu.trace.Trace;
 import com.baidu.trace.api.entity.LocRequest;
 import com.baidu.trace.api.entity.OnEntityListener;
 import com.baidu.trace.model.LocationMode;
@@ -82,12 +81,11 @@ public class MainActivity extends Activity {
     private EditText editText2;
     public LocationClient mLocClient = null;
 
-    private static OnTraceListener startTraceListener = null;
     private static OnEntityListener entityListener = null;
     private RefreshThread refreshThread = null;
     private static BitmapDescriptor realtimeBitmap = null;
     private static BitmapDescriptor videoPointBitmap = null;
-    private static OverlayOptions overlay; //起始点图标overlay
+    private static OverlayOptions overlay; //图标overlay
     private static PolylineOptions polyline;
     private List<LatLng> pointList = new ArrayList<>();
     private LBSTraceClient client;
@@ -232,7 +230,6 @@ public class MainActivity extends Activity {
          * @param marker 视频图标点击后，播放对应视频
          */
         public boolean onMarkerClick(Marker marker){
-            System.out.println("onMarkerClick: 有有。。。。。1");
 
             LatLng markerPoint = marker.getPosition();
             try {
@@ -240,20 +237,40 @@ public class MainActivity extends Activity {
                 if (points.size()>=1) {
                     for(Point point : points){
                         if(point.getLatitude()==markerPoint.latitude && point.getLongitude()==markerPoint.longitude){
-                            if(point.getStartOrEnd() == 1 || point.getStartOrEnd() == 2) {
-                                Intent intent = new Intent(MainActivity.this, DialogActivity.class);
+                            System.out.println("数据 11111111");
+                            if(point.getStartOrEnd() != 0 ) {
+                                /*Intent intent = new Intent(MainActivity.this, DialogActivity.class);
                                 intent.putExtra("pointDate", point.getDate().toString());
-                                startActivity(intent);
+                                startActivity(intent);*/
+
+                                System.out.println("数据 2222222");
+                                if (point.getSavePath() == null) {
+                                    @SuppressLint("SimpleDateFormat") String date = new
+                                            SimpleDateFormat("yyyy年MM月dd日 HH:mm:ss")
+                                            .format(point.getDate());
+                                    AlertDialog.Builder dialog = new AlertDialog.Builder(MainActivity.this);
+                                    dialog.setTitle("详细信息");
+                                    dialog.setMessage("该点记录时间为：" + date);
+                                    dialog.setPositiveButton("确定", new DialogInterface.OnClickListener() {
+                                        @Override
+                                        public void onClick(DialogInterface dialog, int which) {
+
+                                        }
+                                    });
+                                    dialog.show();
+                                    break;
+                                } else {
+                                    PlayActivity.actionStart(MainActivity.this, point.getSavePath());
+                                    break;
+                                }
+
+                            }else if (point.getSavePath() != null) {
+                                 //如果该点是终点并且与一视频相关联，当点击该点时，播放视频
+                                PlayActivity.actionStart(MainActivity.this, point.getSavePath());
+                                break;
                             }
-                            if (!point.getSavePath().equals("")) {
-                                Intent intent = new Intent(MainActivity.this,PlayActivity.class);
-                                intent.putExtra("filename",point.getSavePath());
-                                startActivity(intent);
-
-                            }
 
 
-                            break;
                         }
 
                     }
@@ -278,8 +295,29 @@ public class MainActivity extends Activity {
         init(); //相关变量初始化
         initListener(); //初始化监听器
         LitePal.getDatabase();  //建立数据库
-        
-        
+
+
+        List <Point> points = DataSupport.findAll(Point.class);
+
+        if (!points.isEmpty()) {
+            for(Point point : points){
+                try {
+                    Log.d(TAG, "onCreate: groupid--" + point.getGroupId());
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    System.out.println("----------wrong");
+                }
+                System.out.println("数据 "+point.toString());
+            }
+        } else {
+            Log.d(TAG, "onCreate: " + "没有");
+            System.out.println("----------wrong");
+        }
+        //DataSupport.deleteAll(Point.class);
+        //editor = prefs.edit();
+        //editor.clear();
+        //editor.apply();
+
     }
 
     private void init(){
@@ -303,7 +341,7 @@ public class MainActivity extends Activity {
         //int gatherInterval = 1; //定位周期，秒
         //String entityName = getImei(getApplicationContext());
         client = new LBSTraceClient(getApplicationContext());
-        client.setLocationMode(LocationMode.Device_Sensors);
+        client.setLocationMode(LocationMode.High_Accuracy);
         //trace = new Trace(serviceId, entityName,false);  //实例化轨迹服务
         //client.setInterval(gatherInterval, packInterval);  //设置位置采集和打包周期
         //client.startTrace(trace, startTraceListener);
@@ -346,10 +384,10 @@ public class MainActivity extends Activity {
                     List <Point> allPoints = DataSupport.findAll(Point.class);
                     List<Point> historyPoints = new ArrayList<Point>();
                     if (!content.isEmpty() && !content2.isEmpty()) {
-                        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");    //将内容转换为时间
+                        @SuppressLint("SimpleDateFormat")SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");    //将内容转换为时间
                         try {
-                            startTime = sdf.parse(content).getTime()/1000+12*3600;
-                            endTime = sdf.parse(content2).getTime()/1000+12*3600;
+                            startTime = sdf.parse(content).getTime()+12*3600*1000;//一毫秒为单位（1*10^13）
+                            endTime = sdf.parse(content2).getTime()+12*3600*1000;
                         } catch (ParseException e) {
                             e.printStackTrace();
                             Toast.makeText(getApplicationContext(),"格式应为：2017010101",
@@ -357,6 +395,7 @@ public class MainActivity extends Activity {
                         }
                         for(Point point : allPoints){
                             long time = point.getDate().getTime();
+
                             if(time>=startTime && time<=endTime){//遍历所有满足条件的point
                                 historyPoints.add(point);
                                 if(point.getSavePath() != null){  //判断该点是否与某视频相关联
@@ -449,6 +488,7 @@ public class MainActivity extends Activity {
 
 
                 } else {
+                    startRefreshThread(false);
                     editor = prefs.edit();
                     editor.clear();
                     editor.putInt("groupId", groupId);
@@ -458,7 +498,6 @@ public class MainActivity extends Activity {
                     pointList.clear();
                     mBaiduMap.clear();
                     //client.stopGather(startTraceListener);
-                    startRefreshThread(false);
                     Point point = DataSupport.findLast(Point.class);//标记为终点
                     point.setStartOrEnd(2);
                     point.save();
@@ -479,12 +518,13 @@ public class MainActivity extends Activity {
                 super.onReceiveLocation(traceLocation);
                 LatLng point = new LatLng(traceLocation.getLatitude(),traceLocation.getLongitude());
 
-                if(pointList.size()==0){
+                if(pointList.size()==0 && refreshThread.isAlive()){
                     overlay = new MarkerOptions().position(point)
                             .icon(realtimeBitmap).zIndex(9).draggable(false);
                     mBaiduMap.addOverlay(overlay);
                     pointList.add(point);
-                    Date date = new Date(System.currentTimeMillis()/1000);
+
+                    Date date = new Date();
                     Point point1 = new Point();  //Point表数据
                     point1.setDate(date);
                     point1.setLatitude(point.latitude);
@@ -499,7 +539,7 @@ public class MainActivity extends Activity {
                         Toast.makeText(getApplicationContext(),"夏树让："+distance,Toast.LENGTH_SHORT).show();
                         pointList.add(point);
                         drawRealtimePoint(point,last);
-                        Date date = new Date(System.currentTimeMillis()/1000);
+                        Date date = new Date();
                         Point point1 = new Point();  //Point表数据
                         point1.setDate(date);
                         point1.setLatitude(point.latitude);
@@ -534,16 +574,15 @@ public class MainActivity extends Activity {
     private class RefreshThread extends Thread{
 
         protected boolean refresh = true;
-        private int packInterval = 3;
+        private int gatherInterval = 2;
         public void run(){
 
             while(refresh){
                 queryRealtimeTrack();
-                System.out.println("线程更新"+pointList.size());
                 try{
-                    Thread.sleep(packInterval * 1000);
+                    Thread.sleep(gatherInterval * 1000);
                 }catch(InterruptedException e){
-                    System.out.println("线程休眠失败");
+                    e.printStackTrace();
                 }
             }
 
@@ -592,7 +631,7 @@ public class MainActivity extends Activity {
         List<LatLng> latLngs = new ArrayList<LatLng>();
         latLngs.add(last);
         latLngs.add(point);
-        polyline = new PolylineOptions().width(10).color(Color.BLUE).points(latLngs);
+        polyline = new PolylineOptions().width(15).color(Color.BLUE).points(latLngs);
         mBaiduMap.addOverlay(polyline);
 
     }
@@ -635,8 +674,18 @@ public class MainActivity extends Activity {
 
             }
         }
-        polyline = new PolylineOptions().width(15).color(Color.BLUE).points(latlngs);
+        polyline = new PolylineOptions().width(15).color(getRandomColor()).points(latlngs);
         mBaiduMap.addOverlay(polyline);
+    }
+
+    /**
+     * 获取随机颜色
+     *
+     */
+    private int getRandomColor() {
+        int []randomColor = {0xFFEE9572,0xFFD2691E, 0xFFCD6839,
+                0xFFCAE1FF, 0xFF8B8B83, 0xFF7FFFD4,0xFF4682B4,0xFF40E0D0};
+        return randomColor[(int)(Math.random()*randomColor.length)];
     }
 
     /**
@@ -659,7 +708,7 @@ public class MainActivity extends Activity {
     private void setLocationOption() {
         LocationClientOption option = new LocationClientOption();
         option.setOpenGps(true);  //打开GPS
-        option.setLocationMode(LocationClientOption.LocationMode.Device_Sensors); //设置定位模式
+        option.setLocationMode(LocationClientOption.LocationMode.Hight_Accuracy); //设置定位模式
         option.setCoorType("bd09ll"); //返回的定位结果是百度经纬度默认值gcj02
         option.setScanSpan(2000);  //设置发起定位请求的间隔时间为2000ms
         //option.setOpenAutoNotifyMode(); //设置打开自动回调位置模式，该开关打开后，期间只要定位SDK检测到位置变化
