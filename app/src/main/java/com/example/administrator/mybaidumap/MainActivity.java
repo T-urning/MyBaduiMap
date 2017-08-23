@@ -4,12 +4,14 @@ package com.example.administrator.mybaidumap;
  * 功能：实现实时轨迹显示，历史轨迹查询以及拍摄视频与定位位置相关联功能
  */
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
@@ -17,7 +19,13 @@ import android.os.Environment;
 import android.os.StrictMode;
 import android.preference.PreferenceManager;
 import android.provider.MediaStore;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -237,13 +245,9 @@ public class MainActivity extends Activity {
                 if (points.size()>=1) {
                     for(Point point : points){
                         if(point.getLatitude()==markerPoint.latitude && point.getLongitude()==markerPoint.longitude){
-                            System.out.println("数据 11111111");
                             if(point.getStartOrEnd() != 0 ) {
-                                /*Intent intent = new Intent(MainActivity.this, DialogActivity.class);
-                                intent.putExtra("pointDate", point.getDate().toString());
-                                startActivity(intent);*/
 
-                                System.out.println("数据 2222222");
+
                                 if (point.getSavePath() == null) {
                                     @SuppressLint("SimpleDateFormat") String date = new
                                             SimpleDateFormat("yyyy年MM月dd日 HH:mm:ss")
@@ -320,10 +324,10 @@ public class MainActivity extends Activity {
 
     }
 
+
     private void init(){
 
         mMapView = (MapView) findViewById(R.id.bmapView);
-        switchButton = (Button) findViewById(R.id.switch_btn);  //地图样式按钮
         recordButton = (Button) findViewById(R.id.record_btn);   //录视频按钮
         startTrackButton = (Button) findViewById(R.id.start_btn);    //记录轨迹按钮
         searchButton = (Button) findViewById(R.id.search_btn);
@@ -336,30 +340,62 @@ public class MainActivity extends Activity {
         mLocClient = new LocationClient(getApplicationContext()); //实例化LocationClient类
         mLocClient.registerLocationListener(myListener);  //注册监听函数
         this.setLocationOption();
-        mLocClient.start();
 
-        //int gatherInterval = 1; //定位周期，秒
-        //String entityName = getImei(getApplicationContext());
+
         client = new LBSTraceClient(getApplicationContext());
         client.setLocationMode(LocationMode.High_Accuracy);
-        //trace = new Trace(serviceId, entityName,false);  //实例化轨迹服务
-        //client.setInterval(gatherInterval, packInterval);  //设置位置采集和打包周期
-        //client.startTrace(trace, startTraceListener);
         realtimeBitmap = BitmapDescriptorFactory.fromResource(R.drawable.icon_start);
-        //纠偏选项
 
         prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
+        //请求权限
+        List<String> permissionList = new ArrayList<>();
+        if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED){
+            permissionList.add(Manifest.permission.ACCESS_FINE_LOCATION);
+        }
+        if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED){
+            permissionList.add(Manifest.permission.CAMERA);
+        }
+        if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED){
+            permissionList.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        }
+        if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED){
+            permissionList.add(Manifest.permission.RECORD_AUDIO);
+        }
+
+        if(!permissionList.isEmpty()){
+            String []permissions = permissionList.toArray(new String[permissionList.size()]);
+            ActivityCompat.requestPermissions(MainActivity.this, permissions, 1);
+        } else {
+            requestLocationWhenStart();
+        }
     }
 
+    private void requestLocationWhenStart(){
+        mLocClient.start();
+    }
 
-    private void initListener(){
-        /**
-         * 切换地图样式（附加清除数据）
-         */
-        switchButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        //为ActionBar扩展菜单项
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.main_activity_actions, menu);
+        return super.onCreateOptionsMenu(menu);
+    }
 
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        //处理动作按钮的点击事件
+        switch (item.getItemId()){
+
+            case R.id.set_item:
+
+                return true;
+
+            case R.id.change_item:
                 if (switchStyleFlag) {
                     DataSupport.deleteAll(Point.class);
                     editor = prefs.edit();
@@ -371,9 +407,15 @@ public class MainActivity extends Activity {
                     mBaiduMap.setMapType(BaiduMap.MAP_TYPE_NORMAL);
                     switchStyleFlag = true;
                 }
+                return true;
 
-            }
-        });
+            default:
+                return super.onOptionsItemSelected(item);
+        }
+    }
+
+    private void initListener(){
+
         searchButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -381,39 +423,13 @@ public class MainActivity extends Activity {
                     historyShow = false;
                     String content = editText.getText().toString(); //获取编辑框1的内容
                     String content2 = editText2.getText().toString();   //获取编辑框2的内容
-                    List <Point> allPoints = DataSupport.findAll(Point.class);
-                    List<Point> historyPoints = new ArrayList<Point>();
-                    if (!content.isEmpty() && !content2.isEmpty()) {
-                        @SuppressLint("SimpleDateFormat")SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");    //将内容转换为时间
-                        try {
-                            startTime = sdf.parse(content).getTime()+12*3600*1000;//一毫秒为单位（1*10^13）
-                            endTime = sdf.parse(content2).getTime()+12*3600*1000;
-                        } catch (ParseException e) {
-                            e.printStackTrace();
-                            Toast.makeText(getApplicationContext(),"格式应为：2017010101",
-                                    Toast.LENGTH_SHORT).show();
-                        }
-                        for(Point point : allPoints){
-                            long time = point.getDate().getTime();
-
-                            if(time>=startTime && time<=endTime){//遍历所有满足条件的point
-                                historyPoints.add(point);
-                                if(point.getSavePath() != null){  //判断该点是否与某视频相关联
-                                    LatLng latLng = new LatLng(point.getLatitude(),point.getLongitude());
-                                    videoPointBitmap = BitmapDescriptorFactory.fromResource(R.drawable.icon_video);
-                                    overlay = new MarkerOptions().position(latLng)
-                                            .icon(videoPointBitmap).zIndex(9).draggable(true);
-                                    mBaiduMap.addOverlay(overlay);
-                                }
-                            }
-
-                        }
-                        drawHistoryTrack(historyPoints);
-
-                    } else{
+                    if ((!content.equals("")) && (!content2.equals("")) ) {
+                        queryHistoryByTime(content, content2);
+                    } else {
                         Toast.makeText(getApplicationContext(),"请输入完整日期！",
                                 Toast.LENGTH_SHORT).show();
                     }
+
                 } else {
                     historyShow = true;
                     editText.setText("");
@@ -555,17 +571,72 @@ public class MainActivity extends Activity {
             }
         };
     }
+    private void queryHistoryByTime(String start, String end){
+        List <Point> allPoints = DataSupport.findAll(Point.class);
+        List<Point> historyPoints = new ArrayList<>();
+        @SuppressLint("SimpleDateFormat")SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");    //将内容转换为时间
+        try {
+            startTime = sdf.parse(start).getTime()+12*3600*1000;//一毫秒为单位（1*10^13）
+            endTime = sdf.parse(end).getTime()+12*3600*1000;
+        } catch (ParseException e) {
+            e.printStackTrace();
+            Toast.makeText(getApplicationContext(),"格式应为：20170101",
+                    Toast.LENGTH_SHORT).show();
+        }
+        for(Point point : allPoints){
+            long time = point.getDate().getTime();
+
+            if(time>=startTime && time<=endTime){//遍历所有满足条件的point
+                historyPoints.add(point);
+                if(point.getSavePath() != null){  //判断该点是否与某视频相关联
+                    LatLng latLng = new LatLng(point.getLatitude(),point.getLongitude());
+                    videoPointBitmap = BitmapDescriptorFactory.fromResource(R.drawable.icon_video);
+                    overlay = new MarkerOptions().position(latLng)
+                            .icon(videoPointBitmap).zIndex(9).draggable(true);
+                    mBaiduMap.addOverlay(overlay);
+                }
+            }
+
+        }
+        drawHistoryTrack(historyPoints);
+
+    }
     /**
      * 计算两点之间的距离
      */
-    public static double getDistance(LatLng point1,LatLng point2)
+    private double getDistance(LatLng point1,LatLng point2)
     {
         double lat1 = point1.latitude*100000;
         double lng1 = point1.longitude*100000;
         double lat2 = point2.latitude*100000;
         double lng2 = point2.longitude*100000;
+
         return sqrt((lat1-lat2)*(lat1-lat2)+(lng1-lng2)*(lng1-lng2));
+
     }
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        switch (requestCode){
+            case 1:
+                if(grantResults.length > 0){
+                    for(int result :grantResults){
+                        if(result != PackageManager.PERMISSION_GRANTED){
+                            Toast.makeText(this, "您必须同意所有权限才能使用本程序", Toast.LENGTH_SHORT).show();
+                            finish();
+                            return;
+                        }
+                    }
+
+                } else {
+                    Toast.makeText(this, "发生未知错误", Toast.LENGTH_SHORT).show();
+                }
+                requestLocationWhenStart();
+                break;
+            default:
+                break;
+        }
+    }
+
 
     /**
      *  追踪开始

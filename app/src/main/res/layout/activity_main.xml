@@ -22,54 +22,50 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:id="@+id/searchResult_bar"
+            android:hint="@string/start_edit_hint"
              />
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="至"
-            android:textStyle="bold"/>
+            android:text="@string/since_to"
+            android:textStyle="bold"
+            android:textSize="18sp"/>
         <EditText
             android:layout_weight="1"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:id="@+id/searchResult_bar2"
+            android:hint="@string/end_edit_hint"
            />
         <Button
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:id="@+id/search_btn"
-            android:text="查找"
-            android:layout_weight="0.03"
-            android:textSize="20sp"
-            android:layout_alignRight="@+id/bmapView"/>
+            android:text="@string/query"
+            android:textSize="20sp" />
 
     </LinearLayout>
 
 
-        <Button
-            android:id="@+id/switch_btn"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="切换/删"
-            android:textSize="20sp"
-            android:layout_below="@+id/linearLayout"
-            android:layout_alignRight="@+id/bmapView" />
+
         <Button
             android:id="@+id/start_btn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="轨迹"
+            android:text="@string/track"
             android:textSize="20sp"
-            android:layout_below="@+id/switch_btn"
+            android:layout_below="@+id/linearLayout"
+            android:layout_alignEnd="@+id/bmapView"
             android:layout_alignRight="@+id/bmapView" />
         <Button
             android:id="@+id/record_btn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="录视频"
+            android:text="@string/record"
             android:textSize="20sp"
             android:layout_below="@+id/start_btn"
-            android:layout_alignRight="@+id/bmapView" />
+            android:layout_alignEnd="@+id/bmapView"
+            android:layout_alignRight="@+id/bmapView"/>
 
 
 </RelativeLayout>

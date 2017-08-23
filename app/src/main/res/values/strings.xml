@@ -1,7 +1,11 @@
 <resources>
     <string name="app_name">MyBaiduMap</string>
-    <string name="change">切换</string>
+    <string name="change">切换/删除</string>
+    <string name="query">查找</string>
     <string name="record">录制</string>
     <string name="track">记轨</string>
     <string name="set">设置</string>
+    <string name="since_to">至</string>
+    <string name="start_edit_hint">开始时间</string>
+    <string name="end_edit_hint">结束时间</string>
 </resources>
