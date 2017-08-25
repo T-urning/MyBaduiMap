@@ -8,11 +8,13 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -54,7 +56,6 @@ import com.baidu.trace.LBSTraceClient;
 import com.baidu.trace.api.entity.LocRequest;
 import com.baidu.trace.api.entity.OnEntityListener;
 import com.baidu.trace.model.LocationMode;
-import com.baidu.trace.model.OnTraceListener;
 import com.baidu.trace.model.TraceLocation;
 import com.example.administrator.mybaidumap.db.Point;
 
@@ -77,7 +78,6 @@ public class MainActivity extends Activity {
     private SharedPreferences.Editor editor;
     private MapView mMapView = null;
     private BaiduMap mBaiduMap = null;
-    private Button switchButton;   //切换地图样式按钮
     private Button recordButton;   //录视频按钮
     private Button startTrackButton;   //开始记录轨迹按钮
     private Button searchButton;    //搜寻历史轨迹按钮
@@ -105,6 +105,8 @@ public class MainActivity extends Activity {
     private long endTime;   //终止时间
     private int groupId;
 
+    private long exitTime = 0;
+
 
 
 
@@ -120,11 +122,12 @@ public class MainActivity extends Activity {
                     .longitude(bdLocation.getLongitude()).build();
 
             mBaiduMap.setMyLocationData(locData);
-            if(isFirstLoc){
+            //判断是否为第一次定位且Gps已开启
+            if(isFirstLoc  && isOpenGps(MainActivity.this )){
                 isFirstLoc = false;
                 //设置地图中心点以及缩放级别
                 LatLng ll = new LatLng(bdLocation.getLatitude(),bdLocation.getLongitude());
-                MapStatusUpdate u = MapStatusUpdateFactory.newLatLngZoom(ll,18);
+                MapStatusUpdate u = MapStatusUpdateFactory.newLatLngZoom(ll,16);
                 mBaiduMap.animateMapStatus(u);
                /* BitmapDescriptor mCurrentMarker = BitmapDescriptorFactory.fromResource(R.drawable.icon_marka4);
                  OverlayOptions option = new MarkerOptions()
@@ -370,7 +373,7 @@ public class MainActivity extends Activity {
             String []permissions = permissionList.toArray(new String[permissionList.size()]);
             ActivityCompat.requestPermissions(MainActivity.this, permissions, 1);
         } else {
-            requestLocationWhenStart();
+                requestLocationWhenStart();
         }
     }
 
@@ -392,15 +395,15 @@ public class MainActivity extends Activity {
         switch (item.getItemId()){
 
             case R.id.set_item:
-
+                DataSupport.deleteAll(Point.class);
+                editor = prefs.edit();
+                editor.clear();
+                editor.apply();
                 return true;
 
             case R.id.change_item:
                 if (switchStyleFlag) {
-                    DataSupport.deleteAll(Point.class);
-                    editor = prefs.edit();
-                    editor.clear();
-                    editor.apply();
+
                     mBaiduMap.setMapType(BaiduMap.MAP_TYPE_SATELLITE);
                     switchStyleFlag = false;
                 } else {
@@ -486,21 +489,25 @@ public class MainActivity extends Activity {
             public void onClick(View v) {
 
                 if (isFirstTrace) {
-                    //判断是否有groupId缓存数据，有就提取并加一，否则赋值为1（第一次创建活动时）。
-
-                    if (prefs.contains("groupId")) {
-                        groupId = prefs.getInt("groupId", 0) + 1;
+                    //先判断是否已开启GPS
+                    if (isOpenGps(MainActivity.this)) {
+                        //判断是否有groupId缓存数据，有就提取并加一，否则赋值为1（第一次创建活动时）。
+                        if (prefs.contains("groupId")) {
+                            groupId = prefs.getInt("groupId", 0) + 1;
+                        } else {
+                            groupId = 1;
+                            editor = prefs.edit();
+                            editor.putInt("groupId", groupId);
+                            editor.apply();
+                        }
+                        //开始实时显示轨迹
+                        startRefreshThread(true);
+                        mBaiduMap.clear();
+                        isFirstTrace = false;
+                        //client.startGather(startTraceListener);
                     } else {
-                        groupId = 1;
-                        editor = prefs.edit();
-                        editor.putInt("groupId", groupId);
-                        editor.apply();
+                        Toast.makeText(getApplicationContext(), "请先开启GPS", Toast.LENGTH_SHORT).show();
                     }
-                    //开始实时显示轨迹
-                    startRefreshThread(true);
-                    mBaiduMap.clear();
-                    isFirstTrace = false;
-                    //client.startGather(startTraceListener);
 
 
                 } else {
@@ -571,13 +578,28 @@ public class MainActivity extends Activity {
             }
         };
     }
+
+    /**
+     * 判断GPS是否开启
+     * @param context 上下文对象
+     * @return true表示已开启GPS
+     */
+
+    private boolean isOpenGps(Context context){
+
+        LocationManager locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+
+        //boolean network = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+        return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+    }
+
     private void queryHistoryByTime(String start, String end){
         List <Point> allPoints = DataSupport.findAll(Point.class);
         List<Point> historyPoints = new ArrayList<>();
         @SuppressLint("SimpleDateFormat")SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");    //将内容转换为时间
         try {
-            startTime = sdf.parse(start).getTime()+12*3600*1000;//一毫秒为单位（1*10^13）
-            endTime = sdf.parse(end).getTime()+12*3600*1000;
+            startTime = sdf.parse(start).getTime();//一毫秒为单位（1*10^13）
+            endTime = sdf.parse(end).getTime();
         } catch (ParseException e) {
             e.printStackTrace();
             Toast.makeText(getApplicationContext(),"格式应为：20170101",
@@ -598,7 +620,11 @@ public class MainActivity extends Activity {
             }
 
         }
-        drawHistoryTrack(historyPoints);
+        if (historyPoints.size() > 0) {
+            drawHistoryTrack(historyPoints);
+        } else {
+            Toast.makeText(getApplicationContext(),"该时区未记录轨迹",Toast.LENGTH_SHORT).show();
+        }
 
     }
     /**
@@ -672,7 +698,6 @@ public class MainActivity extends Activity {
 
     /**
      * 启动刷新线程
-     * @param isStart
      */
     private void startRefreshThread(boolean isStart){
 
@@ -710,19 +735,22 @@ public class MainActivity extends Activity {
     private void drawHistoryTrack(List<Point>pointList){
 
         int listSize = pointList.size();
-        if (listSize > 0) {
-
-            int firstGroupId = pointList.get(0).getGroupId();
-            int lastGroupId = pointList.get(listSize-1).getGroupId();
-            for(int i = firstGroupId; i<= lastGroupId; i++){
-                List<Point> points = DataSupport.where("groupId = ?",String.valueOf(i)).find(Point.class);
-                if (points.size() > 1) {
-                    drawHistoryByGroup(points);
-                }
+        double lat = pointList.get(listSize/2).getLatitude();
+        double lon = pointList.get(listSize/2).getLongitude();
+        LatLng ll = new LatLng(lat,lon);
+        int firstGroupId = pointList.get(0).getGroupId();
+        int lastGroupId = pointList.get(listSize-1).getGroupId();
+        for(int i = firstGroupId; i<= lastGroupId; i++){
+            List<Point> points = DataSupport.where("groupId = ?",String.valueOf(i)).find(Point.class);
+            if (points.size() > 1) {
+                drawHistoryByGroup(points);
             }
-        } else {
-            Toast.makeText(getApplicationContext(),"该时区未记录轨迹",Toast.LENGTH_SHORT).show();
         }
+        //把屏幕中心转向历史轨迹
+        MapStatusUpdate u = MapStatusUpdateFactory.newLatLngZoom(ll,17);
+        mBaiduMap.animateMapStatus(u);
+
+
     }
 
     private void drawHistoryByGroup(List<Point> points) {
@@ -857,6 +885,18 @@ public class MainActivity extends Activity {
                 "VID_"+ timeStamp + ".mp4");
 
         return mediaFile;
+    }
+
+    @Override
+    public void onBackPressed() {
+        if ((System.currentTimeMillis() - exitTime) > 2000) {
+            Toast.makeText(getApplicationContext(), "再按一次退出程序",
+                    Toast.LENGTH_SHORT).show();
+            exitTime = System.currentTimeMillis();
+        } else {
+            super.onBackPressed();
+        }
+
     }
 
     @Override
